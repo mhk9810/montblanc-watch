@@ -3,15 +3,15 @@
 
 - TMB 공식 사이트(Nant Borrant, La Nova): 달력의 2027년 6월 칸 상태를 읽어서
   'Close'가 아닌 칸이 하나라도 생기면 = 예약 오픈으로 판단.
-- Rifugio Bonatti: 달력 없이 요청 폼만 있어서, 페이지 본문이 바뀌면 알림.
+- Rifugio Bonatti: 예약 폼 날짜칸의 막힌 기간(data-disable-range)에서
+  2027년 6월 날짜가 하나라도 풀리면 = 예약 오픈으로 판단.
 결과는 docs/status.json(웹사이트가 읽음)에 저장하고, 상태가 바뀌면 ntfy로 푸시.
 """
-import hashlib
 import html
 import json
 import re
 import urllib.request
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 STATUS = Path(__file__).resolve().parent / "docs" / "status.json"
@@ -38,10 +38,19 @@ def june_2027(page):
     return dict(re.findall(r'title="(\d{2}/06/2027) — ([^"]+)"', page))
 
 
-def page_text(page):
-    page = re.sub(r"<script.*?</script>|<style.*?</style>", "", page, flags=re.S)
-    text = html.unescape(re.sub(r"<[^>]+>", " ", page))
-    return re.sub(r"\s+", " ", text).strip()
+def bonatti_june(page):
+    """체크인 칸의 막힌 기간을 읽어 (6월에 열린 날짜 목록, 막힌 기간 원문)을 돌려준다."""
+    m = re.search(r'name="date-1"[^>]*data-disable-range="([^"]*)"', page)
+    if not m:
+        return None, None
+    raw = html.unescape(m.group(1))
+    ranges = []
+    for part in filter(None, (x.strip() for x in raw.split(","))):
+        a, b = (datetime.strptime(x.strip(), "%m/%d/%Y").date() for x in part.split(" - "))
+        ranges.append((a, b))
+    june = [date(2027, 6, d) for d in range(1, 31)]
+    free = [d for d in june if not any(a <= d <= b for a, b in ranges)]
+    return free, raw
 
 
 def push(title, msg, url=None):
@@ -86,17 +95,23 @@ def main():
             push(f"🏔 {name} 6월 예약 열림!", summary, entry["url"])
         new["refuges"][name] = entry
 
+    prev = old.get("bonatti", {})
     try:
-        digest = hashlib.sha256(page_text(fetch(BONATTI)).encode()).hexdigest()
-        prev = old.get("bonatti", {})
-        changed_at = prev.get("changed_at")
-        if prev.get("hash") and prev["hash"] != digest:
-            print("[Bonatti] 페이지 내용 변경 감지")
-            push("🏔 Bonatti 예약 페이지 변경됨", "rifugiobonatti.it 확인해보세요", BONATTI)
-            changed_at = now.isoformat()
-        new["bonatti"] = {"hash": digest, "changed_at": changed_at, "url": BONATTI}
+        free, raw = bonatti_june(fetch(BONATTI))
+        if free is None:
+            print("[Bonatti] 날짜칸 설정을 못 찾음 (사이트 구조 변경?)")
+            new["bonatti"] = {**prev, "status": "unknown", "url": BONATTI}
+        else:
+            status = "open" if free else "closed"
+            print(f"[Bonatti] 6월 상태: {status} (막힌 기간: {raw})")
+            days = {f"{d.day:02d}": "선택 가능" for d in free}
+            if status == "open" and prev.get("status") != "open":
+                push("🏔 Bonatti 6월 예약 열림!", f"6월 {free[0].day}일~{free[-1].day}일 선택 가능", BONATTI)
+            new["bonatti"] = {"status": status, "days": days, "blocked": raw, "url": BONATTI,
+                              "since": prev.get("since") if prev.get("status") == status else now.isoformat()}
     except Exception as e:
         print(f"[Bonatti] 가져오기 실패: {e}")
+        new["bonatti"] = prev
 
     # 결과가 같으면 하루 한 번만 커밋 (저장소가 비활성으로 꺼지지 않게)
     new["checked_date"] = now.strftime("%Y-%m-%d")

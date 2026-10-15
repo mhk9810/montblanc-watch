@@ -71,6 +71,7 @@ const REPO = "mhk9810/montblanc-watch";
 const INFO = {
   "Nant Borrant": "프랑스 · Les Contamines · 1459m",
   "La Nova": "프랑스 · Les Chapieux",
+  "Rifugio Bonatti": "이탈리아 · Courmayeur · Val Ferret",
 };
 
 function ago(iso) {
@@ -93,20 +94,11 @@ function card(name, r) {
   </div>`;
 }
 
-function bonattiCard(b) {
-  return `<div class="card">
-    <h2>Rifugio Bonatti</h2><p class="sub">이탈리아 · Courmayeur · Val Ferret</p>
-    <p class="note">달력 없이 <b>요청서</b>를 보내면 산장에서 메일로 확정해주는 방식이에요. 지금도 신청서는 보낼 수 있어요.
-    ${b.changed_at ? `<br>📝 예약 페이지 내용이 바뀌었어요 (${ago(b.changed_at)})` : ""}</p>
-    <a class="btn ghost" href="${b.url || "https://www.rifugiobonatti.it/en/book-now/"}" target="_blank">신청서 페이지 보기</a>
-  </div>`;
-}
-
 async function load() {
   try {
     const s = await (await fetch("status.json?t=" + Date.now())).json();
     document.getElementById("cards").innerHTML =
-      Object.entries(s.refuges).map(([n, r]) => card(n, r)).join("") + bonattiCard(s.bonatti || {});
+      Object.entries({...s.refuges, "Rifugio Bonatti": s.bonatti || {}}).map(([n, r]) => card(n, r)).join("");
   } catch (e) {
     document.getElementById("cards").innerHTML = `<p class="note">상태를 불러오지 못했어요. 잠시 후 다시 열어주세요.</p>`;
   }
