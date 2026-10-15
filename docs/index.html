@@ -43,6 +43,9 @@
   .badge.open { background: var(--open-bg); color: var(--open); }
   .badge.wait { background: var(--wait-bg); color: var(--wait); }
   .days { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 12px; }
+  .watch { font-size: 15px; font-weight: 700; padding: 10px 12px; border-radius: 10px; margin: 0 0 12px; }
+  .watch.full { background: var(--wait-bg); color: var(--wait); }
+  .watch.free { background: var(--open-bg); color: var(--open); }
   .days span { font-size: 13px; background: var(--open-bg); color: var(--open); padding: 3px 8px; border-radius: 8px; }
   a.btn {
     display: block; text-align: center; text-decoration: none; font-weight: 700;
@@ -99,6 +102,12 @@ function card(name, r) {
   return `<div class="card">
     <h2>${name}</h2><p class="sub">${INFO[name] || ""}</p>
     <div class="badge ${open ? "open" : "wait"}">${open ? "🟢 6월 예약 열렸어요!" : "⏳ 아직 안 열렸어요"}</div>
+    ${Object.entries(r.watch || {}).map(([d, w]) => {
+      const label = `${+d.slice(3, 5)}월 ${+d.slice(0, 2)}일`;
+      return w.seats
+        ? `<p class="watch free">🛏 ${label}: ${w.seats}자리 났어요! 빨리 예약하세요</p>`
+        : `<p class="watch full">🛏 ${label}: 만실 · 자리 나면 바로 알려드려요</p>`;
+    }).join("")}
     ${open ? `<div class="days">${days}</div>` : ""}
     <a class="btn ${open ? "" : "ghost"}" href="${r.url}" target="_blank">${open ? "지금 예약하러 가기" : "예약 페이지 보기"}</a>
   </div>`;

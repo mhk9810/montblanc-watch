@@ -23,8 +23,9 @@ KST = timezone(timedelta(hours=9))
 
 TMB = {
     "Nant Borrant": "https://www.montourdumontblanc.com/en/refuges/refuge-de-nant-borrant",
-    "La Nova": "https://www.montourdumontblanc.com/en/refuges/auberge-refuge-de-la-nova",
 }
+# 만실인 날짜에 자리가 나면 알림 (La Nova는 예약 완료라 감시 종료)
+WATCH_DATES = {"Nant Borrant": ["26/06/2027"]}
 BONATTI = "https://www.rifugiobonatti.it/en/book-now/"
 # 알림 채널 (ntfy.sh 웹/앱에서 구독)
 NTFY_TOPIC = "montblanc-2027-3ecf3d6f"
@@ -98,6 +99,17 @@ def check_once():
         if status == "open" and prev.get("status") != "open":
             summary = ", ".join(f"{d}일 {s}" for d, s in list(days.items())[:8])
             push(f"🏔 {name} 6월 예약 열림!", summary, entry["url"])
+        watch = {}
+        for d in WATCH_DATES.get(name, []):
+            st = cells.get(d, "?")
+            seats = int(m.group(1)) if (m := re.match(r"(\d+) available", st)) else 0
+            watch[d] = {"status": st, "seats": seats}
+            print(f"[{name}] {d} 감시: {st}")
+            if seats and not prev.get("watch", {}).get(d, {}).get("seats"):
+                push(f"🛏 {name} {int(d[3:5])}월 {int(d[:2])}일 자리 났어요!",
+                     f"{seats}자리 남음 · 빨리 예약하세요", entry["url"])
+        if watch:
+            entry["watch"] = watch
         new["refuges"][name] = entry
 
     prev = old.get("bonatti", {})
