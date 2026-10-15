@@ -3,18 +3,15 @@
 
 - TMB 공식 사이트(Nant Borrant, La Nova): 달력의 2027년 6월 칸 상태를 읽어서
   'Close'가 아닌 칸이 하나라도 생기면 = 예약 오픈으로 판단.
-- Rifugio Bonatti: 예약 폼 날짜칸의 막힌 기간(data-disable-range)에서
-  2027년 6월 날짜가 하나라도 풀리면 = 예약 오픈으로 판단.
 결과는 docs/status.json과 ntfy 상태 채널(웹사이트가 읽음)에 남기고, 상태가 바뀌면 ntfy로 푸시.
 --serve N 으로 실행하면 N초 동안 웹사이트의 "지금 확인하기" 신호를 기다렸다가 바로 확인한다.
 """
-import html
 import json
 import re
 import sys
 import time
 import urllib.request
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 STATUS = Path(__file__).resolve().parent / "docs" / "status.json"
@@ -26,7 +23,6 @@ TMB = {
 }
 # 만실인 날짜에 자리가 나면 알림 (La Nova는 예약 완료라 감시 종료)
 WATCH_DATES = {"Nant Borrant": ["26/06/2027"]}
-BONATTI = "https://www.rifugiobonatti.it/en/book-now/"
 # 알림 채널 (ntfy.sh 웹/앱에서 구독)
 NTFY_TOPIC = "montblanc-2027-3ecf3d6f"
 STATUS_TOPIC = NTFY_TOPIC + "-status"  # 매 확인 결과 (웹사이트가 읽음)
@@ -42,21 +38,6 @@ def fetch(url):
 def june_2027(page):
     """{'02/06/2027': 'Close', ...}"""
     return dict(re.findall(r'title="(\d{2}/06/2027) — ([^"]+)"', page))
-
-
-def bonatti_june(page):
-    """체크인 칸의 막힌 기간을 읽어 (6월에 열린 날짜 목록, 막힌 기간 원문)을 돌려준다."""
-    m = re.search(r'name="date-1"[^>]*data-disable-range="([^"]*)"', page)
-    if not m:
-        return None, None
-    raw = html.unescape(m.group(1))
-    ranges = []
-    for part in filter(None, (x.strip() for x in raw.split(","))):
-        a, b = (datetime.strptime(x.strip(), "%m/%d/%Y").date() for x in part.split(" - "))
-        ranges.append((a, b))
-    june = [date(2027, 6, d) for d in range(1, 31)]
-    free = [d for d in june if not any(a <= d <= b for a, b in ranges)]
-    return free, raw
 
 
 def push(title, msg, url=None, topic=NTFY_TOPIC, priority=5):
@@ -76,7 +57,7 @@ def check_once():
     old = json.loads(STATUS.read_text()) if STATUS.exists() else {}
     old_refuges = old.get("refuges", {})
     now = datetime.now(KST)
-    new = {"refuges": {}, "bonatti": old.get("bonatti", {})}
+    new = {"refuges": {}}
 
     for name, url in TMB.items():
         prev = old_refuges.get(name, {})
@@ -112,25 +93,7 @@ def check_once():
             entry["watch"] = watch
         new["refuges"][name] = entry
 
-    prev = old.get("bonatti", {})
-    try:
-        free, raw = bonatti_june(fetch(BONATTI))
-        if free is None:
-            print("[Bonatti] 날짜칸 설정을 못 찾음 (사이트 구조 변경?)")
-            new["bonatti"] = {**prev, "status": "unknown", "url": BONATTI}
-        else:
-            status = "open" if free else "closed"
-            print(f"[Bonatti] 6월 상태: {status} (막힌 기간: {raw})")
-            days = {f"{d.day:02d}": "선택 가능" for d in free}
-            if status == "open" and prev.get("status") != "open":
-                push("🏔 Bonatti 6월 예약 열림!", f"6월 {free[0].day}일~{free[-1].day}일 선택 가능", BONATTI)
-            new["bonatti"] = {"status": status, "days": days, "blocked": raw, "url": BONATTI,
-                              "since": prev.get("since") if prev.get("status") == status else now.isoformat()}
-    except Exception as e:
-        print(f"[Bonatti] 가져오기 실패: {e}")
-        new["bonatti"] = prev
-
-    live = {"checked_at": now.isoformat(), **{k: new[k] for k in ("refuges", "bonatti")}}
+    live = {"checked_at": now.isoformat(), "refuges": new["refuges"]}
     push("status", json.dumps(live, ensure_ascii=False, separators=(",", ":")),
          topic=STATUS_TOPIC, priority=1)
 

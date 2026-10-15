@@ -84,7 +84,6 @@ const REPO = "mhk9810/montblanc-watch";
 const INFO = {
   "Nant Borrant": "프랑스 · Les Contamines · 1459m",
   "La Nova": "프랑스 · Les Chapieux",
-  "Rifugio Bonatti": "이탈리아 · Courmayeur · Val Ferret",
 };
 
 function ago(iso) {
@@ -119,7 +118,7 @@ let lastChecked = null;
 
 function render(s) {
   document.getElementById("cards").innerHTML =
-    Object.entries({...s.refuges, "Rifugio Bonatti": s.bonatti || {}}).map(([n, r]) => card(n, r)).join("");
+    Object.entries(s.refuges).map(([n, r]) => card(n, r)).join("");
   if (s.checked_at) lastChecked = s.checked_at;
   document.getElementById("checked").textContent = lastChecked ? `마지막 확인: ${ago(lastChecked)}` : "";
 }
