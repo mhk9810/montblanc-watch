@@ -5,11 +5,14 @@
   'Close'가 아닌 칸이 하나라도 생기면 = 예약 오픈으로 판단.
 - Rifugio Bonatti: 예약 폼 날짜칸의 막힌 기간(data-disable-range)에서
   2027년 6월 날짜가 하나라도 풀리면 = 예약 오픈으로 판단.
-결과는 docs/status.json(웹사이트가 읽음)에 저장하고, 상태가 바뀌면 ntfy로 푸시.
+결과는 docs/status.json과 ntfy 상태 채널(웹사이트가 읽음)에 남기고, 상태가 바뀌면 ntfy로 푸시.
+--serve N 으로 실행하면 N초 동안 웹사이트의 "지금 확인하기" 신호를 기다렸다가 바로 확인한다.
 """
 import html
 import json
 import re
+import sys
+import time
 import urllib.request
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -25,6 +28,8 @@ TMB = {
 BONATTI = "https://www.rifugiobonatti.it/en/book-now/"
 # 알림 채널 (ntfy.sh 웹/앱에서 구독)
 NTFY_TOPIC = "montblanc-2027-3ecf3d6f"
+STATUS_TOPIC = NTFY_TOPIC + "-status"  # 매 확인 결과 (웹사이트가 읽음)
+TRIGGER_TOPIC = NTFY_TOPIC + "-check"  # 웹사이트 "지금 확인하기" 버튼 신호
 
 
 def fetch(url):
@@ -53,9 +58,9 @@ def bonatti_june(page):
     return free, raw
 
 
-def push(title, msg, url=None):
+def push(title, msg, url=None, topic=NTFY_TOPIC, priority=5):
     """ntfy.sh로 푸시. 탭하면 url이 열린다."""
-    body = {"topic": NTFY_TOPIC, "title": title, "message": msg, "priority": 5}
+    body = {"topic": topic, "title": title, "message": msg, "priority": priority}
     if url:
         body["click"] = url
     try:
@@ -66,7 +71,7 @@ def push(title, msg, url=None):
         print(f"[ntfy] 푸시 실패: {e}")
 
 
-def main():
+def check_once():
     old = json.loads(STATUS.read_text()) if STATUS.exists() else {}
     old_refuges = old.get("refuges", {})
     now = datetime.now(KST)
@@ -113,6 +118,10 @@ def main():
         print(f"[Bonatti] 가져오기 실패: {e}")
         new["bonatti"] = prev
 
+    live = {"checked_at": now.isoformat(), **{k: new[k] for k in ("refuges", "bonatti")}}
+    push("status", json.dumps(live, ensure_ascii=False, separators=(",", ":")),
+         topic=STATUS_TOPIC, priority=1)
+
     # 결과가 같으면 하루 한 번만 커밋 (저장소가 비활성으로 꺼지지 않게)
     new["checked_date"] = now.strftime("%Y-%m-%d")
     if new != old:
@@ -120,5 +129,35 @@ def main():
         STATUS.write_text(json.dumps(new, ensure_ascii=False, indent=2) + "\n")
 
 
+def wait_trigger(since, until):
+    """until까지 버튼 신호를 기다린다. 신호가 오면 그 메시지 id, 아니면 None."""
+    while time.time() < until:
+        try:
+            url = f"https://ntfy.sh/{TRIGGER_TOPIC}/json?since={since}"
+            with urllib.request.urlopen(url, timeout=60) as r:
+                for line in r:
+                    ev = json.loads(line)
+                    if ev.get("event") == "message":
+                        return ev["id"]
+                    if time.time() >= until:
+                        return None
+        except Exception:
+            time.sleep(3)
+    return None
+
+
+def serve(seconds):
+    until = time.time() + seconds
+    since = int(time.time())
+    check_once()
+    while (msg_id := wait_trigger(since, until)):
+        print("[버튼] 지금 확인하기 요청")
+        since = msg_id
+        check_once()
+
+
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) > 2 and sys.argv[1] == "--serve":
+        serve(int(sys.argv[2]))
+    else:
+        check_once()

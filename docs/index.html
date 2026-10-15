@@ -23,7 +23,13 @@
   header h1 { margin: 0; font-size: 22px; }
   header p { margin: 4px 0 0; opacity: .8; font-size: 14px; }
   main { max-width: 560px; margin: 0 auto; padding: 16px; }
-  .checked { font-size: 13px; color: var(--muted); margin: 0 0 14px; }
+  .refresh { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 14px; }
+  .checked { font-size: 14px; color: var(--muted); margin: 0; }
+  #checkNow {
+    font: inherit; font-size: 15px; font-weight: 700; color: #fff; background: var(--brand);
+    border: 0; border-radius: 999px; padding: 10px 16px; white-space: nowrap; cursor: pointer;
+  }
+  #checkNow:disabled { opacity: .55; cursor: default; }
   .card {
     background: var(--card); border: 1px solid var(--line); border-radius: 16px;
     padding: 18px; margin-bottom: 14px;
@@ -53,7 +59,11 @@
   <p>2027년 6월 예약이 열렸는지 5분마다 확인해요</p>
 </header>
 <main>
-  <p class="checked" id="checked">확인 중…</p>
+  <div class="refresh">
+    <p class="checked" id="checked">확인 중…</p>
+    <button id="checkNow" type="button">🔄 지금 확인하기</button>
+  </div>
+  <p class="note" id="checkMsg" hidden></p>
   <div id="cards"></div>
 
   <div class="card">
@@ -94,22 +104,63 @@ function card(name, r) {
   </div>`;
 }
 
+const LIVE = "https://ntfy.sh/montblanc-2027-3ecf3d6f-status";
+const TRIGGER = "https://ntfy.sh/montblanc-2027-3ecf3d6f-check";
+let lastChecked = null;
+
+function render(s) {
+  document.getElementById("cards").innerHTML =
+    Object.entries({...s.refuges, "Rifugio Bonatti": s.bonatti || {}}).map(([n, r]) => card(n, r)).join("");
+  if (s.checked_at) lastChecked = s.checked_at;
+  document.getElementById("checked").textContent = lastChecked ? `마지막 확인: ${ago(lastChecked)}` : "";
+}
+
+// ntfy 상태 채널에서 since 이후의 가장 최신 결과
+async function liveStatus(since) {
+  const text = await (await fetch(`${LIVE}/json?poll=1&since=${since}`)).text();
+  const msgs = text.trim().split("\n").filter(Boolean).map(l => JSON.parse(l)).filter(e => e.event === "message");
+  return msgs.length ? JSON.parse(msgs[msgs.length - 1].message) : null;
+}
+
 async function load() {
   try {
-    const s = await (await fetch("status.json?t=" + Date.now())).json();
-    document.getElementById("cards").innerHTML =
-      Object.entries({...s.refuges, "Rifugio Bonatti": s.bonatti || {}}).map(([n, r]) => card(n, r)).join("");
+    const s = await liveStatus("latest");
+    if (s) return render(s);
+  } catch (e) {}
+  try {
+    render(await (await fetch("status.json?t=" + Date.now())).json());
   } catch (e) {
     document.getElementById("cards").innerHTML = `<p class="note">상태를 불러오지 못했어요. 잠시 후 다시 열어주세요.</p>`;
   }
+}
+
+async function checkNow() {
+  const btn = document.getElementById("checkNow");
+  const msg = document.getElementById("checkMsg");
+  btn.disabled = true;
+  btn.textContent = "확인 중…";
+  msg.hidden = true;
+  const since = Math.floor(Date.now() / 1000);
   try {
-    const r = await (await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/check.yml/runs?per_page=1&status=success`)).json();
-    const t = r.workflow_runs?.[0]?.updated_at;
-    document.getElementById("checked").textContent = t ? `마지막 확인: ${ago(t)}` : "";
+    await fetch(TRIGGER, { method: "POST", body: "check" });
+    for (let i = 0; i < 36; i++) {          // 최대 3분 기다림
+      await new Promise(r => setTimeout(r, 5000));
+      const s = await liveStatus(since);
+      if (s) { render(s); msg.hidden = true; return; }
+      if (i === 6) { msg.textContent = "확인 서버가 잠깐 쉬는 중이에요. 몇 분 안에 확인돼요…"; msg.hidden = false; }
+    }
+    msg.textContent = "아직 응답이 없어요. 조금 뒤에 다시 눌러주세요.";
+    msg.hidden = false;
   } catch (e) {
-    document.getElementById("checked").textContent = "";
+    msg.textContent = "요청을 보내지 못했어요. 인터넷 연결을 확인해주세요.";
+    msg.hidden = false;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "🔄 지금 확인하기";
   }
 }
+
+document.getElementById("checkNow").addEventListener("click", checkNow);
 load();
 setInterval(load, 60000);
 </script>

@@ -16,11 +16,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: python3 check.py
+      # 다음 실행 전까지 "지금 확인하기" 버튼 신호를 기다림
+      - run: python3 check.py --serve 270
       - name: 결과 저장
         run: |
           if ! git diff --quiet docs/status.json; then
             git config user.name "montblanc-bot"
             git config user.email "actions@users.noreply.github.com"
-            git commit -am "상태 업데이트" && git push
+            git commit -am "상태 업데이트" && git pull --rebase -q && git push
           fi
