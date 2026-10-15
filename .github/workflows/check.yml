@@ -1,12 +1,15 @@
 name: check
 
+# 각 실행이 20분 동안 "지금 확인하기" 버튼을 기다리다가, 끝날 때 다음 실행을 직접 시작한다.
+# GitHub 예약(cron)은 자주 밀리거나 안 돌아서, 사슬이 끊겼을 때 다시 살리는 백업으로만 쓴다.
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "*/10 * * * *"
   workflow_dispatch:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: check
@@ -14,10 +17,10 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      # 다음 실행 전까지 "지금 확인하기" 버튼 신호를 기다림
-      - run: python3 check.py --serve 270
+      - run: python3 check.py --serve 1200
       - name: 결과 저장
         run: |
           if ! git diff --quiet docs/status.json; then
@@ -25,3 +28,8 @@ jobs:
             git config user.email "actions@users.noreply.github.com"
             git commit -am "상태 업데이트" && git pull --rebase -q && git push
           fi
+      - name: 다음 실행 시작
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run check.yml -R ${{ github.repository }}

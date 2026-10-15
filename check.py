@@ -146,14 +146,17 @@ def wait_trigger(since, until):
     return None
 
 
-def serve(seconds):
-    until = time.time() + seconds
+def serve(seconds, every=300):
+    """seconds 동안 every초마다 확인하고, 그 사이 버튼 신호가 오면 바로 확인한다."""
+    end = time.time() + seconds
     since = int(time.time())
-    check_once()
-    while (msg_id := wait_trigger(since, until)):
-        print("[버튼] 지금 확인하기 요청")
-        since = msg_id
+    while time.time() < end:
         check_once()
+        next_check = min(time.time() + every, end)
+        while (msg_id := wait_trigger(since, next_check)):
+            print("[버튼] 지금 확인하기 요청")
+            since = msg_id
+            check_once()
 
 
 if __name__ == "__main__":
