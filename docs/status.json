@@ -14,9 +14,11 @@
     }
   },
   "bonatti": {
-    "hash": "d02c8c1c457d7c30f7207296b7d38eb90a9a56fb9124094e329f1427f57ad86a",
-    "changed_at": null,
-    "url": "https://www.rifugiobonatti.it/en/book-now/"
+    "status": "closed",
+    "days": {},
+    "blocked": "10/06/2026 - 02/12/2027,03/31/2027 - 12/31/2028",
+    "url": "https://www.rifugiobonatti.it/en/book-now/",
+    "since": "2026-10-15T16:26:28.251135+09:00"
   },
   "checked_date": "2026-10-15"
 }
