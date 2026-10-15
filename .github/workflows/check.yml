@@ -1,0 +1,26 @@
+name: check
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: check
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 check.py
+      - name: 결과 저장
+        run: |
+          if ! git diff --quiet docs/status.json; then
+            git config user.name "montblanc-bot"
+            git config user.email "actions@users.noreply.github.com"
+            git commit -am "상태 업데이트" && git push
+          fi

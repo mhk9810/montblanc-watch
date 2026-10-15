@@ -1,0 +1,22 @@
+{
+  "refuges": {
+    "Nant Borrant": {
+      "status": "closed",
+      "days": {},
+      "url": "https://www.montourdumontblanc.com/en/refuges/refuge-de-nant-borrant#calendrier",
+      "since": "2026-10-15T16:21:54.113429+09:00"
+    },
+    "La Nova": {
+      "status": "closed",
+      "days": {},
+      "url": "https://www.montourdumontblanc.com/en/refuges/auberge-refuge-de-la-nova#calendrier",
+      "since": "2026-10-15T16:21:54.113429+09:00"
+    }
+  },
+  "bonatti": {
+    "hash": "d02c8c1c457d7c30f7207296b7d38eb90a9a56fb9124094e329f1427f57ad86a",
+    "changed_at": null,
+    "url": "https://www.rifugiobonatti.it/en/book-now/"
+  },
+  "checked_date": "2026-10-15"
+}
