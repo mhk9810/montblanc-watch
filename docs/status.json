@@ -27,7 +27,7 @@
         "23": "Fully booked",
         "24": "Fully booked",
         "25": "Fully booked",
-        "26": "1 available",
+        "26": "Fully booked",
         "27": "Fully booked",
         "28": "Fully booked",
         "29": "Fully booked",
@@ -37,8 +37,8 @@
       "since": "2026-10-15T17:36:19.152794+09:00",
       "watch": {
         "26/06/2027": {
-          "status": "1 available",
-          "seats": 1
+          "status": "Fully booked",
+          "seats": 0
         }
       }
     }
