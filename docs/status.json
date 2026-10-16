@@ -9,11 +9,11 @@
         "05": "17 available",
         "06": "14 available",
         "07": "20 available",
-        "08": "20 available",
+        "08": "18 available",
         "09": "21 available",
         "10": "11 available",
         "11": "13 available",
-        "12": "12 available",
+        "12": "10 available",
         "13": "Fully booked",
         "14": "Fully booked",
         "15": "11 available",
@@ -43,5 +43,5 @@
       }
     }
   },
-  "checked_date": "2026-10-16"
+  "checked_date": "2026-10-17"
 }
